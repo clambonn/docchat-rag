@@ -1,90 +1,105 @@
-# DocChat RAG v2
+# DocChat RAG
 
-> Same RAG pipeline. No more 7 databases. Just Postgres.
-> AG-UI streaming protocol for real-time agent interaction.
+A document question-answering system built with a RAG (Retrieval-Augmented Generation) pipeline. Upload any PDF or DOCX file and ask questions about it in natural language.
 
+---
 
-## Why Postgres for everything
+## What it does
 
-From the TigerData blog: instead of managing Pinecone + Elasticsearch + Postgres separately,
-we use one database with extensions:
+- Accepts PDF and DOCX documents via a drag-and-drop interface
+- Chunks and embeds document content into a vector database
+- Retrieves the most relevant passages when you ask a question
+- Generates grounded answers using an LLM, with source citations
 
-```sql
-CREATE EXTENSION vector;        -- pgvector: HNSW cosine search
-CREATE EXTENSION pg_textsearch; -- BM25: same algorithm as Elasticsearch
-```
+---
 
-One backup. One monitoring dashboard. One connection string.
-AI agents can fork your entire state with a single `pg_dump`.
+## Tech stack
 
-## Why AG-UI
+- **Backend** — FastAPI, asyncpg, pgvector, SentenceTransformers, LangChain
+- **Database** — PostgreSQL 17 with pgvector extension
+- **LLM** — Groq API (llama-3.1-8b-instant)
+- **Frontend** — React + Vite, AG-UI streaming protocol
+- **Deployment** — Docker Compose
 
-AG-UI is an open event-based protocol connecting agent backends to frontends.
-Instead of REST polling, we stream AG-UI events:
+---
 
-```
-RUN_STARTED → TOOL_CALL_START (sources) → TOOL_CALL_END →
-TEXT_MESSAGE_START → TEXT_MESSAGE_CONTENT × N → TEXT_MESSAGE_END →
-STATE_SNAPSHOT → RUN_FINISHED
-```
+## Prerequisites
 
-This lets the UI render sources and streamed tokens in real time,
-with full conversation state sync between agent and frontend.
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed and running
+- A free [Groq API key](https://console.groq.com) (takes 1 minute to get)
 
-## Quick Start
+---
 
-### 1. Postgres with pgvector
+## Setup
 
-```bash
-
-docker run -d -e POSTGRES_PASSWORD=postgres -p 5432:5432 pgvector/pgvector:pg17
-
-
-```
-
-### 2. Backend
+**1. Clone the repo**
 
 ```bash
-cd docchat-v2
-python -m venv venv && source venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env  
-cd backend && uvicorn main:app --reload
+git clone https://github.com/clambonn/docchat-rag.git
+cd docchat-rag
 ```
 
-### 3. Frontend
+**2. Add your Groq API key**
+
+Create a file called `.env` in the root folder:
+
+```
+OPENAI_API_KEY=your_groq_api_key_here
+```
+
+Get a free key from [console.groq.com](https://console.groq.com) → API Keys → Create new key.
+
+**3. Start everything**
 
 ```bash
-cd docchat-v2/frontend
-npm install
-npm run dev  
+docker compose up --build
 ```
 
-## Architecture
+Wait for all three services to start (about 1–2 minutes the first time).
+
+**4. Open the app**
+
+Go to [http://localhost:5173](http://localhost:5173) in your browser.
+
+---
+
+## How to use
+
+1. Click **Upload Document** and select a PDF or DOCX file
+2. Wait for the ingestion to complete (the document will appear in the sidebar)
+3. Type a question in the chat box and press Enter
+4. The answer will stream in with source citations from the document
+
+---
+
+## Stopping the app
+
+```bash
+docker compose down
+```
+
+To also delete the stored documents and embeddings:
+
+```bash
+docker compose down -v
+```
+
+---
+
+## Project structure
 
 ```
-React (AG-UI client)
-  └── POST /api/chat/run → SSE stream
-        ├── RUN_STARTED
-        ├── TOOL_CALL_END { sources: [...] }     ← from Postgres hybrid search
-        ├── TEXT_MESSAGE_CONTENT × N             ← OpenAI token stream
-        ├── STATE_SNAPSHOT { lastSources, ... }  ← shared state
-        └── RUN_FINISHED
-
-Postgres
-  ├── chunks(embedding vector(384))     ← pgvector HNSW index
-  ├── chunks(content text)              ← pg_textsearch BM25 index
-  └── Hybrid RRF query: one SQL, one result
+docchat-rag/
+├── backend/
+│   ├── main.py
+│   ├── api/routes/        # chat, ingest, summarize, health
+│   ├── pipelines/         # ingestion, retrieval, llm
+│   └── utils/             # config, db, agui events, logger
+├── frontend/
+│   └── src/
+│       └── App.jsx        # React UI with streaming chat
+├── backend.Dockerfile
+├── frontend.Dockerfile
+├── docker-compose.yml
+└── requirements.txt
 ```
-
-## API
-
-| Endpoint | Description |
-|---|---|
-| `GET /api/health` | Health + Postgres version |
-| `POST /api/ingest/upload` | Upload PDF/DOCX |
-| `GET /api/ingest/list` | List documents |
-| `DELETE /api/ingest/{doc_id}` | Delete document + chunks |
-| `POST /api/chat/run` | **AG-UI SSE stream** |
-| `POST /api/chat/ask` | JSON fallback |
-| `POST /api/summarize` | Summarize document |

@@ -1,0 +1,54 @@
+version: "3.9"
+
+services:
+  db:
+    image: pgvector/pgvector:pg17
+    container_name: docchat-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: docchat
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend.Dockerfile
+    container_name: docchat-backend
+    ports:
+      - "8000:8000"
+    environment:
+      POSTGRES_DSN: postgresql://postgres:postgres@db:5432/docchat
+      LLM_PROVIDER: openai
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_MODEL: llama-3.1-8b-instant
+      OPENAI_API_BASE: https://api.groq.com/openai/v1
+      EMBEDDING_PROVIDER: sentence_transformers
+      EMBEDDING_MODEL: all-MiniLM-L6-v2
+      EMBEDDING_DIM: "384"
+      RETRIEVAL_TOP_K: "5"
+      RELEVANCE_THRESHOLD: "0.001"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend.Dockerfile
+    container_name: docchat-frontend
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
