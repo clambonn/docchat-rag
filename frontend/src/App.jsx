@@ -194,7 +194,6 @@ export default function DocChatV2() {
         <div style={S.logo}>
           <span style={S.logoIcon}>{Ico.pg}</span>
           <span style={S.logoText}>DocChat</span>
-          <span style={S.logoVersion}>v2</span>
         </div>
 
         <div style={S.sideSection}>

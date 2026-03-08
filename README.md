@@ -3,16 +3,6 @@
 > Same RAG pipeline. No more 7 databases. Just Postgres.
 > AG-UI streaming protocol for real-time agent interaction.
 
-## What changed from v1
-
-| Feature | v1 | v2 |
-|---|---|---|
-| Vector store | ChromaDB (separate process) | **pgvector** (in Postgres) |
-| Full-text search | None | **pg_textsearch BM25** (in Postgres) |
-| Retrieval | Vector-only | **Hybrid: vector + BM25 (RRF)** |
-| Frontend protocol | REST JSON poll | **AG-UI SSE streaming** |
-| Frontend | Gradio | **React + AG-UI** |
-| LLM streaming | ❌ | ✅ Token-by-token |
 
 ## Why Postgres for everything
 
@@ -46,11 +36,10 @@ with full conversation state sync between agent and frontend.
 ### 1. Postgres with pgvector
 
 ```bash
-# Option A: Docker
+
 docker run -d -e POSTGRES_PASSWORD=postgres -p 5432:5432 pgvector/pgvector:pg17
 
-# Option B: Tiger Data cloud (free tier, pre-installed)
-# https://console.cloud.timescale.com
+
 ```
 
 ### 2. Backend
@@ -59,7 +48,7 @@ docker run -d -e POSTGRES_PASSWORD=postgres -p 5432:5432 pgvector/pgvector:pg17
 cd docchat-v2
 python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env   # edit POSTGRES_DSN + OPENAI_API_KEY
+cp .env.example .env  
 cd backend && uvicorn main:app --reload
 ```
 
@@ -68,7 +57,7 @@ cd backend && uvicorn main:app --reload
 ```bash
 cd docchat-v2/frontend
 npm install
-npm run dev   # Vite dev server on http://localhost:5173
+npm run dev  
 ```
 
 ## Architecture

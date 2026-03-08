@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     LLM_PROVIDER: Literal["openai", "ollama", "huggingface"] = "openai"
     OPENAI_API_KEY: str = ""
     OPENAI_MODEL: str = "gpt-4o-mini"
+    OPENAI_API_BASE: str = ""
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     OLLAMA_MODEL: str = "mistral"
     HF_MODEL_ID: str = "mistralai/Mistral-7B-Instruct-v0.2"

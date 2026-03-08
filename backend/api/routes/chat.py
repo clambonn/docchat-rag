@@ -37,7 +37,10 @@ Rules:
 def _get_llm():
     if settings.LLM_PROVIDER == "openai":
         from openai import AsyncOpenAI
-        return AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+        return AsyncOpenAI(
+            api_key=settings.OPENAI_API_KEY,
+            base_url=settings.OPENAI_API_BASE or None,
+        )
     return None
 
 

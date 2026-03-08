@@ -1,11 +1,11 @@
 """
 Postgres connection pool + schema bootstrap.
-Uses asyncpg for async access. pgvector + pg_textsearch installed as extensions.
+Uses asyncpg for async access. pgvector installed as extension.
+Full-text search via Postgres built-in tsvector/GIN index.
 """
 
 from __future__ import annotations
 import asyncpg
-from functools import lru_cache
 from utils.config import settings
 from utils.logger import logger
 
@@ -25,7 +25,6 @@ async def init_db():
     async with pool.acquire() as conn:
         # ── Extensions ───────────────────────────────────────────────────
         await conn.execute("CREATE EXTENSION IF NOT EXISTS vector")
-        await conn.execute("CREATE EXTENSION IF NOT EXISTS pg_textsearch")
 
         # ── Documents table ───────────────────────────────────────────────
         await conn.execute("""
@@ -39,7 +38,7 @@ async def init_db():
             )
         """)
 
-        # ── Chunks table with vector + BM25 ──────────────────────────────
+        # ── Chunks table with vector + full-text ──────────────────────────
         dim = settings.EMBEDDING_DIM
         await conn.execute(f"""
             CREATE TABLE IF NOT EXISTS chunks (
@@ -49,23 +48,22 @@ async def init_db():
                 page        INT,
                 chunk_index INT,
                 content     TEXT NOT NULL,
-                embedding   vector({dim})
+                embedding   vector({dim}),
+                content_tsv TSVECTOR GENERATED ALWAYS AS (to_tsvector('english', content)) STORED
             )
         """)
 
-        # ── Indexes ───────────────────────────────────────────────────────
-        # DiskANN-style HNSW index for vector similarity
+        # ── HNSW index for vector similarity ─────────────────────────────
         await conn.execute("""
             CREATE INDEX IF NOT EXISTS chunks_embedding_idx
             ON chunks USING hnsw (embedding vector_cosine_ops)
             WITH (m = 16, ef_construction = 64)
         """)
 
-        # BM25 full-text index via pg_textsearch
+        # ── GIN index for full-text search ────────────────────────────────
         await conn.execute("""
-            CREATE INDEX IF NOT EXISTS chunks_bm25_idx
-            ON chunks USING bm25(content)
-            WITH (text_config = 'english')
+            CREATE INDEX IF NOT EXISTS chunks_fts_idx
+            ON chunks USING gin(content_tsv)
         """)
 
-    logger.info("✅ Postgres schema ready (pgvector + pg_textsearch)")
+    logger.info("✅ Postgres schema ready (pgvector + full-text search)")
